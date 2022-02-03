@@ -94,6 +94,32 @@ class Atom_clusters():
         return 'The frame has:' + clusters_show
 
 ##############################################################################
+#################### FUNCTIONS TO FILTER EPOCK POINTS #########################
+
+def get_epock_points_to_keep(protein_center,cav_frame,pdb_connolly,sphere_radius):
+        
+    epock_points_to_keep = np.array([[0,0,0]])
+    
+    # distance between all epock and connolly points:
+    epock_pnts_connolly_pnts_dist = scipy.spatial.distance.cdist(cav_frame,pdb_connolly)
+    # closets connolly point to each epock point:
+    closest_connolly_pnts_ndx = np.argmin(epock_pnts_connolly_pnts_dist,axis=1)
+    # closest connolly points' coordinates:
+    closest_connolly_pnt_coord = pdb_connolly[closest_connolly_pnts_ndx]
+    # for each epock grid point: distance between the closest connolly point and the protein center:
+    center_to_closest_connolly_point_dist = scipy.spatial.distance.cdist([protein_center],closest_connolly_pnt_coord)
+    # for each epock grid point: distance between the epock grid point point and the protein center
+    center_to_epock_points_dist = scipy.spatial.distance.cdist([protein_center],cav_frame)
+    # keep only the epock points for which the distance to the protein center < the distance to the closest connolly pont minus (connolly) sphere radius (3.5Å)
+    dist_diff = center_to_epock_points_dist-(center_to_closest_connolly_point_dist-sphere_radius)
+    epock_points_to_keep_ndx = np.argwhere((dist_diff < 0))[:,1]
+    # save the coordinates of the chosen epock points
+    epock_points_to_keep = cav_frame[epock_points_to_keep_ndx]
+    
+    return epock_points_to_keep
+
+
+##############################################################################
 #################### FUNCTIONS TO GET atom_cluster_frames ###################
 
 def grid_point_pairs(cav_frames_in, frame=0, grid_cutoff = 0.5):
