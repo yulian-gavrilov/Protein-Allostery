@@ -1,7 +1,10 @@
 import MDAnalysis as mda
 import numpy as np
+import pandas as pd
+import time
 import argparse
 from EpockGrid2VoidsAllostery_util import mkdir
+from EpockGrid2VoidsAllostery_util import get_epock_points_to_keep
 
 '''
 EpockGrid2VoidsAllostery. Step 1.
@@ -47,15 +50,25 @@ u1 = mda.Universe(f'{cavpdb}', f'{cavxtc}')
 
 nframes=len(u1.trajectory)
 
+########
+'''
 cav_frames=[]
 # non unique entries correspond to unrequired non-empty space grid points
 for i in range (0,len(u1.trajectory)):
     temp = np.unique(u1.trajectory[i].positions,axis=0)
     cav_frames.append(temp)
 
+print ("selected unique grid points in all frames...")
 
-# with open(f'{outf}/{system}_unique_cav_{nframes}fr.npy', 'wb') as f:
-#     np.save(f, cav_frames)
+with open(f'{outf}/{system}_unique_cav_{nframes}fr.npy', 'wb') as f:
+    np.save(f, cav_frames)
+
+#######
+
+with open(f'{outf}/{system}_unique_cav_{nframes}fr.npy', 'rb') as f:
+    cav_frames = np.load(f,allow_pickle=True)
+'''
+#######
 
 u2 = mda.Universe(f'{protpdb}', f'{protxtc}')
 nframes=len(u2.trajectory)
@@ -79,19 +92,23 @@ pdb_connolly_all.append(df[j+1:-1].astype(float).values)
 #####################################################
 
 epock_points_in_frames = []
-u2.trajectory[frame]
-protein_center = u2.select_atoms("resid 0-263").centroid()
-#protein_center = u2.select_atoms("protein").centroid()
 
 start_total_time = time.time()
 
 for frame in range(0,nframes):
     start_time = time.time()
-    epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frames[frame],pdb_connolly_all[frame],sphere_radius)
 
+    cav_frame = np.unique(u1.trajectory[frame].positions,axis=0)
+    print(f"unique frame {frame}")
 
+    u2.trajectory[frame]
+    protein_center = u2.select_atoms("resid 0-263").centroid()
+    #protein_center = u2.select_atoms("protein").centroid()
+    #epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frames[frame],pdb_connolly_all[frame],sphere_radius)
+    epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frame,pdb_connolly_all[frame],sphere_radius)
     epock_points_in_frames.append(epock_points_to_keep)
-    #print(f"frame {frame} --- %s seconds ---" % (time.time() - start_time))
+
+    print(f"frame {frame} --- %s seconds ---" % (time.time() - start_time))
 
 print("--- total %s seconds ---" % (time.time() - start_total_time))
 

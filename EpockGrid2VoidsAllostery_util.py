@@ -94,32 +94,6 @@ class Atom_clusters():
         return 'The frame has:' + clusters_show
 
 ##############################################################################
-#################### FUNCTIONS TO FILTER EPOCK POINTS #########################
-
-def get_epock_points_to_keep(protein_center,cav_frame,pdb_connolly,sphere_radius):
-        
-    epock_points_to_keep = np.array([[0,0,0]])
-    
-    # distance between all epock and connolly points:
-    epock_pnts_connolly_pnts_dist = scipy.spatial.distance.cdist(cav_frame,pdb_connolly)
-    # closets connolly point to each epock point:
-    closest_connolly_pnts_ndx = np.argmin(epock_pnts_connolly_pnts_dist,axis=1)
-    # closest connolly points' coordinates:
-    closest_connolly_pnt_coord = pdb_connolly[closest_connolly_pnts_ndx]
-    # for each epock grid point: distance between the closest connolly point and the protein center:
-    center_to_closest_connolly_point_dist = scipy.spatial.distance.cdist([protein_center],closest_connolly_pnt_coord)
-    # for each epock grid point: distance between the epock grid point point and the protein center
-    center_to_epock_points_dist = scipy.spatial.distance.cdist([protein_center],cav_frame)
-    # keep only the epock points for which the distance to the protein center < the distance to the closest connolly pont minus (connolly) sphere radius (3.5Å)
-    dist_diff = center_to_epock_points_dist-(center_to_closest_connolly_point_dist-sphere_radius)
-    epock_points_to_keep_ndx = np.argwhere((dist_diff < 0))[:,1]
-    # save the coordinates of the chosen epock points
-    epock_points_to_keep = cav_frame[epock_points_to_keep_ndx]
-    
-    return epock_points_to_keep
-
-
-##############################################################################
 #################### FUNCTIONS TO GET atom_cluster_frames ###################
 
 def grid_point_pairs(cav_frames_in, frame=0, grid_cutoff = 0.5):
@@ -700,14 +674,147 @@ def get_res_persistency_in_cluster(atom_clusters_frames_with_res, all_persistenc
     res_in_cluster_abs_percent_dict = {}
 
     for key in res_in_cluster_dict:
-        res_in_cluster_percent_dict[key] = round(res_in_cluster_dict[key]*100/all_persistency_clIDs[aclusterID],2)
-        res_in_cluster_abs_percent_dict[key] = round(res_in_cluster_dict[key]*100/nframes,2)
+        res_in_cluster_percent_dict[key] = round(res_in_cluster_dict[key]*100/all_persistency_clIDs[aclusterID],2) # persistence only when this cluster exists
+        res_in_cluster_abs_percent_dict[key] = round(res_in_cluster_dict[key]*100/nframes,2) # persistency in frames
     #     print(res_in_cluster_dict[key],"or", round(res_in_cluster_dict[key]*100/all_persistency_clIDs[aclusterID],2), "%",
     #          "or",round(res_in_cluster_dict[key]*100/nframes,2), "abs % ")
 
     return res_in_cluster_dict, res_in_cluster_percent_dict, res_in_cluster_abs_percent_dict
 
-def make_pymol_script(all_persistency_clIDs_percent,
+def make_pymol_script(all_persistency_clIDs,
+                      all_persistency_clIDs_percent,
+                     atom_clusters_frames_with_res,
+                     system,nframes,selected_contacts_dict,
+                     persistency_cutoff_percent = 10,
+                     sphere_radius_scaler = 3,
+                     radius_correction = 1500):
+
+    # all_persistency_clIDs_percent
+    # atom_clusters_frames_with_res
+    # system
+    # nframes
+
+    # print("")
+    cluster_groups_pml = []
+    spheres_strings_pml = []
+    cylinders_strings_pml = []
+
+    #sphere_radius_scaler = 3
+    cluster_groups_pml.append("bg_color white\n")
+    cluster_groups_pml.append("color gray70, all")
+    cluster_groups_pml.append("\n\n")
+
+    # spheres
+    #https://doc.instantreality.org/tools/color_calculator/
+    red = [0.949, 0.152, 0.094]
+    orange = [0.921, 0.380, 0.156]
+    pink = [0.929, 0.549, 0.564]
+    light_blue = [0.549, 0.929, 0.921]
+    #blue = [0.247, 0.325, 0.850]
+    dark_blue = [0.035, 0.023, 0.815]
+
+    spheres_strings_pml.append("")
+    spheres_strings_pml.append("from pymol.cgo import *")
+    spheres_strings_pml.append("from pymol import cmd")
+    spheres_strings_pml.append("")
+
+    for i in all_persistency_clIDs_percent.keys():
+        cl_frame = int(i.split("_")[0])
+        cl_index = int(i.split("_")[1])
+        #print (cl_frame,cl_index)
+        for j in atom_clusters_frames_with_res[cl_frame].clusters:
+    #         print (j.clusterID)
+    #         print("###")
+            if j.clusterID == i:
+                cluster_groups_pml.append("select resi")
+                cluster_groups_pml.append(" ")
+                
+                
+                _, res_in_cluster_percent_dict, _ = \
+                                get_res_persistency_in_cluster(atom_clusters_frames_with_res, 
+                                all_persistency_clIDs, 
+                                nframes, aclusterID = j.clusterID, 
+                                first_res = 1, last_res = 265)
+                
+                persistant_res = 0
+                for res in set(j.atoms):
+                    if (res_in_cluster_percent_dict[res] >= persistency_cutoff_percent): 
+                        # same persistency as for the cluster itself 
+                        # like: cluster exist at least 50% of frames 
+                        # and this residue belongs to the cluster at least 50% of its existance
+                        cluster_groups_pml.append(res)
+                        cluster_groups_pml.append("+")
+                        persistant_res+=1
+                    
+                    
+                del cluster_groups_pml[-1]
+                cluster_groups_pml.append("\n")
+                cluster_groups_pml.append("set_name sele, ")
+                cluster_groups_pml.append("c")
+                cluster_groups_pml.append(i)
+                cluster_groups_pml.append("\n")
+
+                #sphere_radius = len(set(j.atoms))/sphere_radius_scaler
+                sphere_radius = persistant_res/sphere_radius_scaler
+
+                spheres_strings_pml.append(f"sphere_c{i} = cmd.centerofmass(\"c{i}\")")
+                spheres_strings_pml.append(f"sphere_c{i}.append({sphere_radius})")
+
+                if  all_persistency_clIDs_percent[i] in range (80,100+1):
+                    #print (all_persistency_clIDs_percent[i], "red")
+                    spheres_strings_pml.append(f"color_c{i} = {red}#red")
+                elif all_persistency_clIDs_percent[i] in range (60,80):
+                    spheres_strings_pml.append(f"color_c{i} = {orange}#orange")
+                elif all_persistency_clIDs_percent[i] in range (40,60):
+                    spheres_strings_pml.append(f"color_c{i} = {pink}#pink")
+                elif all_persistency_clIDs_percent[i] in range (20,40):
+                    spheres_strings_pml.append(f"color_c{i} = {light_blue}#light_blue")
+                elif all_persistency_clIDs_percent[i] in range (0,20):
+                    spheres_strings_pml.append(f"color_c{i} = {dark_blue}#dark blue")
+
+    #             print(f"sphere_{i} = cmd.centerofmass(\"{i}\")")
+    #             print("")
+
+    spheres_strings_pml.append("")
+    spheres_strings_pml.append("spherelist = [ \\")
+
+    for i in all_persistency_clIDs_percent.keys():
+        spheres_strings_pml.append(f"   COLOR,    color_c{i}[0],color_c{i}[1],color_c{i}[2],\\")
+        spheres_strings_pml.append(f"   SPHERE,   sphere_c{i}[0],sphere_c{i}[1],sphere_c{i}[2],sphere_c{i}[3],\\")
+
+    spheres_strings_pml.append("]")
+    spheres_strings_pml.append("")
+
+    spheres_strings_pml.append("cmd.load_cgo(spherelist, 'all_spheres',   1)")
+
+    # cylinders
+    cylinders_strings_pml.append("")
+    #cylinders_strings_pml.append("radius=1")
+    #radius_correction = 1500
+    for pair in selected_contacts_dict.keys():
+
+        radius = float(selected_contacts_dict[pair])/radius_correction
+        cylinders_strings_pml.append(f"radius={radius}")
+
+        cl0 = pair.split("-")[0]
+        cl1 = pair.split("-")[1]
+        cylinders_strings_pml.append(f"cylinder_{cl0}_{cl1} = [ 9.0, sphere_c{cl0}[0],sphere_c{cl0}[1],sphere_c{cl0}[2], sphere_c{cl1}[0],sphere_c{cl1}[1],sphere_c{cl1}[2],radius,0,0,0,0,0,0 ]")
+        cylinders_strings_pml.append(f"cmd.load_cgo(cylinder_{cl0}_{cl1},\"c{cl0}_{cl1}\")")
+    # put all the the pml file:
+
+    with open(f'for_pymol_{system}_{nframes}fr_persistency{persistency_cutoff_percent}.pml', 'w') as f:
+
+        for string0 in cluster_groups_pml:
+            print(string0, end="", file=f)
+
+        for string1 in spheres_strings_pml:
+            print(string1, file=f)
+
+        for string2 in cylinders_strings_pml:
+            print(string2, file=f)
+
+
+def make_pymol_script_without_considering_res_persistancy(all_persistency_clIDs_percent,
                      atom_clusters_frames_with_res,
                      system,nframes,selected_contacts_dict,
                      persistency_cutoff_percent = 10,
