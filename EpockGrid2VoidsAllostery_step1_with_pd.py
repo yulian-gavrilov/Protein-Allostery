@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import time
 import argparse
-import bz2
 from EpockGrid2VoidsAllostery_util import mkdir
 from EpockGrid2VoidsAllostery_util import get_epock_points_to_keep
 
@@ -77,80 +76,41 @@ nframes=len(u2.trajectory)
 ######################################################
 
 sphere_radius=3.5
-f = bz2.open(f"{edtsurf}", "rt")
+df = pd.read_csv(f"{edtsurf}", compression='bz2',header=None, sep="\s+",engine='python')
+df.reset_index(level=0, inplace=True)
 
-#pdb_connolly_current = []
-pdb_connolly_current=np.empty((0, 3), float)
+pdb_connolly_all = []
+
+end_frame_ndx = df[df["index"].str.contains("frame")].index
+
+i=1
+for j in end_frame_ndx[1:]:
+    pdb_connolly_all.append(df[i:j].astype(float).values)
+    i = j + 1
+pdb_connolly_all.append(df[j+1:-1].astype(float).values)
+
+#####################################################
+
 epock_points_in_frames = []
 
 start_total_time = time.time()
 
+for frame in range(0,nframes):
+    start_time = time.time()
 
-frame = 0
-while True:
+    cav_frame = np.unique(u1.trajectory[frame].positions,axis=0)
+    print(f"unique frame {frame}")
 
-    line_raw = f.readline()
-    line = line_raw.split(" ")
+    u2.trajectory[frame]
+    protein_center = u2.select_atoms("resid 0-263").centroid()
+    #protein_center = u2.select_atoms("protein").centroid()
+    #epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frames[frame],pdb_connolly_all[frame],sphere_radius)
+    epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frame,pdb_connolly_all[frame],sphere_radius)
+    epock_points_in_frames.append(epock_points_to_keep)
 
-    if "frame" in line and line[1] == '0\n':
-        next
+    print(f"frame {frame} --- %s seconds ---" % (time.time() - start_time))
 
-    elif "frame" in line and line[1] != '0\n':
-        #print (frame, len(pdb_connolly_current))
-
-        # do all the stuff here
-        #####
-        start_time = time.time()
-
-        cav_frame = np.unique(u1.trajectory[frame].positions,axis=0)
-        #print(f"unique frame {frame}")
-
-        u2.trajectory[frame]
-        protein_center = u2.select_atoms("resid 0-263").centroid()
-
-        epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frame,pdb_connolly_current,sphere_radius)
-        epock_points_in_frames.append(epock_points_to_keep)
-
-        print(f"frame {frame} --- %s seconds ---" % (time.time() - start_time))
-        ####
-
-        # do in the end of iteration:
-        #pdb_connolly_current = []
-        pdb_connolly_current=np.empty((0, 3), float)
-        frame+=1
-        next
-
-    elif not line_raw:
-        #print (frame, len(pdb_connolly_current))
-
-        # do all the stuff here for the last frame:
-        #####
-        start_time = time.time()
-
-        cav_frame = np.unique(u1.trajectory[frame].positions,axis=0)
-        #print(f"unique frame {frame}")
-
-        u2.trajectory[frame]
-        protein_center = u2.select_atoms("resid 0-263").centroid()
-
-        epock_points_to_keep = get_epock_points_to_keep(protein_center,cav_frame,pdb_connolly_current,sphere_radius)
-        epock_points_in_frames.append(epock_points_to_keep)
-
-        print(f"frame {frame} --- %s seconds ---" % (time.time() - start_time))
-        ####
-
-        break
-
-    else:
-        for i in range(len(line)):
-            line[i]=float(line[i])
-        #pdb_connolly_current.append(line)
-        pdb_connolly_current = np.append(pdb_connolly_current, np.array([line]), axis=0)
-        #print (pdb_connolly_current)
-
-f.close()
 print("--- total %s seconds ---" % (time.time() - start_total_time))
-
 
 #####################################################
 
