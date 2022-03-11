@@ -94,12 +94,14 @@ for i in range(1,nframes):
         print("step: ",i)
 
     if i == 1:
-        cluster_storage_out_temp, _ = get_jaccard_updated_clusters(atom_clusters_frames, atom_clusters_frames[0], i) # relative to all stored clusters
-        all_cluster_storage_out.append(cluster_storage_out_temp)
+        #cluster_storage_out_temp, _ = get_jaccard_updated_clusters(atom_clusters_frames, atom_clusters_frames[0], i) # relative to all stored clusters
+        cluster_storage_out_temp, _ = get_jaccard_updated_clusters(atom_clusters_frames[i], atom_clusters_frames[0]) # relative to all stored clusters
+        #all_cluster_storage_out.append(cluster_storage_out_temp)
     else:
-        cluster_storage_out, _ = get_jaccard_updated_clusters(atom_clusters_frames, cluster_storage_out_temp, i) # relative to all stored clusters
+        #cluster_storage_out, _ = get_jaccard_updated_clusters(atom_clusters_frames, cluster_storage_out_temp, i) # relative to all stored clusters
+        cluster_storage_out, _ = get_jaccard_updated_clusters(atom_clusters_frames[i], cluster_storage_out_temp) # relative to all stored clusters
         cluster_storage_out_temp = cluster_storage_out
-        all_cluster_storage_out.append(cluster_storage_out_temp)
+        #all_cluster_storage_out.append(cluster_storage_out_temp)
 
 print ("atom_clusters_frames is updated now...")
 
@@ -123,20 +125,22 @@ for i in range(1,nframes):
         print("step: ",i)
 
     if i == 1:
-        cluster_split_merge, JF, Jrows, Jcols  = get_jaccard_merge_split_clusters(atom_clusters_frames, atom_clusters_frames[0], i)
+        #cluster_split_merge, JF, Jrows, Jcols  = get_jaccard_merge_split_clusters(atom_clusters_frames, atom_clusters_frames[0], i)
+        cluster_split_merge, JF, Jrows, Jcols  = get_jaccard_merge_split_clusters(atom_clusters_frames[i], atom_clusters_frames[0])
 
         current_splits, current_merges = get_current_splits_and_merges(JF,Jrows,Jcols)
         all_splits.append(current_splits)
         all_merges.append(current_merges)
-        all_cluster_split_merge.append(cluster_split_merge)
+        #all_cluster_split_merge.append(cluster_split_merge)
 
     else:
-        cluster_split_merge, JF, Jrows, Jcols  = get_jaccard_merge_split_clusters(atom_clusters_frames, atom_clusters_frames[i-1], i)
+        #cluster_split_merge, JF, Jrows, Jcols  = get_jaccard_merge_split_clusters(atom_clusters_frames, atom_clusters_frames[i-1], i)
+        cluster_split_merge, JF, Jrows, Jcols  = get_jaccard_merge_split_clusters(atom_clusters_frames[i], atom_clusters_frames[i-1])
 
         current_splits, current_merges = get_current_splits_and_merges(JF,Jrows,Jcols)
         all_splits.append(current_splits)
         all_merges.append(current_merges)
-        all_cluster_split_merge.append(cluster_split_merge)
+        #all_cluster_split_merge.append(cluster_split_merge)
 
 ###############
 print ("got all split/merge events")

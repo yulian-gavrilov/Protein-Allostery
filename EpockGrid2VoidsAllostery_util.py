@@ -306,7 +306,7 @@ def get_atom_clusters_frames_with_res(atom_clusters_frames,atom_res_dict):
 
 ##########################################FUNCTIONS TO GET MERGES, SPLITS and N matrix ###############################################
 
-def get_jaccard_updated_clusters(atom_clusters_frames, cluster_storage, compare_frame_ndx = 1):
+def get_jaccard_updated_clusters_old(atom_clusters_frames, cluster_storage, compare_frame_ndx = 1):
 
     # !!! also updates atom_clusters_frames
 
@@ -332,8 +332,37 @@ def get_jaccard_updated_clusters(atom_clusters_frames, cluster_storage, compare_
 
     return cluster_storage_out, JM
 
+##############################################
 
-def get_jaccard_merge_split_clusters(atom_clusters_frames, cluster_storage, compare_frame_ndx = 1):
+def get_jaccard_updated_clusters(atom_clusters_frame, cluster_storage):
+
+    # !!! also updates atom_clusters_frames
+
+
+    cluster_storage_out = deepcopy(cluster_storage)
+
+    JM = np.zeros(shape=(len(atom_clusters_frame.clusters),len(cluster_storage.clusters)))  # jaccard matrix
+    max_Jaccard = np.array([])
+
+    for i in range (0,len(atom_clusters_frame.clusters)):
+        for j in range (0,len(cluster_storage.clusters)):
+                temp = jaccard(cluster_storage.clusters[j].atoms, atom_clusters_frame.clusters[i].atoms)
+                JM[i][j] = temp
+        max_Jaccard_i = np.where(JM[i] == np.amax(JM[i]))[0][0]
+        max_Jaccard = np.append(max_Jaccard,max_Jaccard_i)
+
+        if JM[i,max_Jaccard_i] == 0:
+            cluster_storage_out.append_clusters(atom_clusters_frame.clusters[i])
+        else:
+            #cluster_storage_out.clusters[max_Jaccard_i].merge_cluster(atom_clusters_frame.clusters[i])
+
+            atom_clusters_frame.clusters[i].clusterID = cluster_storage_out.clusters[max_Jaccard_i].clusterID
+
+    return cluster_storage_out, JM
+
+################################################################################################
+
+def get_jaccard_merge_split_clusters_old(atom_clusters_frames, cluster_storage, compare_frame_ndx = 1):
 
     cluster_storage_out = deepcopy(cluster_storage)
 
@@ -360,6 +389,37 @@ def get_jaccard_merge_split_clusters(atom_clusters_frames, cluster_storage, comp
 
     return cluster_storage_out, JM, Jrows, Jcols
 
+################################
+
+def get_jaccard_merge_split_clusters(atom_clusters_frame, cluster_storage):
+
+    cluster_storage_out = deepcopy(cluster_storage)
+
+
+    JM = np.zeros(shape=(len(atom_clusters_frame.clusters),len(cluster_storage.clusters)))  # jaccard matrix
+    max_Jaccard = np.array([])
+    Jrows = np.array([])
+    Jcols = np.array([])
+    for i in range (0,len(atom_clusters_frame.clusters)):
+        Jrows = np.append(Jrows,atom_clusters_frame.clusters[i].clusterID)
+        for j in range (0,len(cluster_storage.clusters)):
+                temp = jaccard(cluster_storage.clusters[j].atoms, atom_clusters_frame.clusters[i].atoms)
+                JM[i][j] = temp
+                if i == 0:
+                    Jcols = np.append(Jcols,cluster_storage.clusters[j].clusterID)
+
+        max_Jaccard_i = np.where(JM[i] == np.amax(JM[i]))[0][0]
+        max_Jaccard = np.append(max_Jaccard,max_Jaccard_i)
+
+        if JM[i,max_Jaccard_i] == 0:
+            cluster_storage_out.append_clusters(atom_clusters_frame.clusters[i])
+        else:
+            cluster_storage_out.clusters[max_Jaccard_i].merge_cluster(atom_clusters_frame.clusters[i])
+
+    return cluster_storage_out, JM, Jrows, Jcols
+
+
+################################################################################################
 
 def get_current_splits_and_merges(JF,Jrows,Jcols):
 
